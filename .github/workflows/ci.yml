@@ -18,8 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - name: Récupération du code
+        uses: actions/checkout@v5
+      - name: Node
+        uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -33,3 +35,5 @@ jobs:
         run: npm run test
       - name: Build
         run: npm run build
+      - name: Précache hors-ligne
+        run: npm run check:precache

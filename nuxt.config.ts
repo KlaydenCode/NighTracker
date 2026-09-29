@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import {
   SUPABASE_KEY_PLACEHOLDER,
   SUPABASE_URL_PLACEHOLDER,
@@ -11,6 +13,10 @@ const missingEnv = missingSupabaseEnv({ url: supabaseUrl, key: supabaseKey })
 if (missingEnv.length > 0) {
   console.warn(`[supabase] Variable(s) d'environnement manquante(s) : ${missingEnv.join(', ')}. Voir .env.example.`)
 }
+
+// Révision de offline.html, calculée ici car le module retire l'extension .html des entrées
+// qu'il génère (createManifestTransform) : on l'ajoute donc à la main, après les transformations.
+const offlineRevision = createHash('md5').update(readFileSync('./public/offline.html')).digest('hex')
 
 export default defineNuxtConfig({
   modules: ['@nuxtjs/tailwindcss', '@nuxtjs/supabase', '@vite-pwa/nuxt', '@nuxt/eslint'],
@@ -58,6 +64,8 @@ export default defineNuxtConfig({
       navigateFallback: null,
       // Obligatoire : le module ajoute sinon un seul motif qui remplace les motifs par défaut.
       globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest}'],
+      globIgnores: ['offline.html'],
+      additionalManifestEntries: [{ url: 'offline.html', revision: offlineRevision }],
       runtimeCaching: [{
         urlPattern: ({ request }: { request: Request }) => request.mode === 'navigate',
         handler: 'NetworkOnly',

@@ -14,6 +14,7 @@
     "lint": "eslint .",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
+    "check:precache": "node scripts/check-precache.mjs",
     "generate-pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {
