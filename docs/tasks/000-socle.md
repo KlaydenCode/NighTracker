@@ -293,5 +293,18 @@ Aucune migration dans ce lot (décision validée) : seulement `supabase/migratio
 
 ## 4. Revue (reviewer)
 
-- **Verdict** : ✅ OK | 🔁 à corriger | ⛔ bloquant
-- Détail : voir le rapport de revue.
+### Tour 1 — 2026-09-29
+
+- **Verdict** : 🔁 à corriger (changements demandés).
+- Bloquant CA12 : `@vite-pwa/nuxt` précachait `offline.html` sous l'URL `offline` (transform du module), donc `matchPrecache('/offline.html')` du `PrecacheFallbackPlugin` ne trouvait rien : pas d'écran hors-ligne.
+- Mineurs : mentions « proposer la mise à jour de CLAUDE.md » dans la fiche (déjà faite) ; `process.cwd()` dans `tests/socle.test.ts` ; regex « blanc pur » trop étroite ; étapes checkout/setup-node non nommées dans la CI.
+
+### Tour 2 — 2026-09-29
+
+- **Verdict** : ✅ OK, approuvé avec réserves (réserves = vérifications humaines hors de portée des agents : CA1, CA7, CA11 à CA14, CA18 à CA25, dont l'étape manuelle 6 sur téléphone).
+- Contrôles relancés : `lint` ✅ · `typecheck` ✅ · `test` ✅ (31) · `build` ✅ · `check:precache` ✅.
+- Bloquant CA12 levé (commit 1a9368b) : `sw.js` contient `{url:"offline.html",revision:"e260b357…"}` (md5 identique à `public/offline.html` et au fichier servi), aucune entrée `url:"offline"`. Workbox résout entrées et `fallbackURL` avec `new URL(…, location.href)` (SW à `/sw.js`) : `offline.html` et `/offline.html` donnent la même clé. Build servi : `/offline.html` → 200, « Pas de connexion pour le moment. » ; `/offline` → shell SPA (confirme le bug du tour 1).
+- `scripts/check-precache.mjs` éprouvé sur des copies modifiées de `sw.js` : échec (code 1) si `sw.js` absent, si l'entrée redevient `offline`, si elle disparaît, si `offline` coexiste avec `/offline.html`, et si le format change (0 entrée lue).
+- Mineurs du tour 1 : tous traités (fd393d2, 4db56b1, 1a9368b).
+- Commit e0fad5c (CLAUDE.md, agents) relu : cohérent, sans effet sur le code.
+- Suggestions non bloquantes : voir le rapport de revue du tour 2 (chemin de `offline.html` dans `nuxt.config.ts` relatif au cwd, message explicite si 0 entrée dans le script, `manifest.webmanifest` en triple dans le précache, renvoi « ci-dessous » en section 3, plan CI de la section 2 sans l'étape de précache).

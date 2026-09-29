@@ -76,7 +76,7 @@ L'agent principal orchestre la chaîne et lance chaque agent dès que le précé
 1. **product-owner → tech-lead** : enchaînés automatiquement. Si le product-owner laisse des questions ouvertes, le tech-lead part des réponses par défaut proposées dans la fiche.
 2. **Validation humaine n° 1** : l'humain valide la fiche (besoin, plan, réponses aux questions ouvertes) et les modifications de spec proposées. Seul arrêt avant le code.
 3. **developer → reviewer** : enchaînés automatiquement.
-4. **Boucle de correction** : si le verdict est « changements demandés », l'agent principal vérifie le problème bloquant, relance le developer avec les retours, puis le reviewer. Au plus **3 tours** ; au-delà, ou si un retour contredit la spec ou demande un arbitrage produit, on s'arrête et on demande à l'humain.
-5. **Validation humaine n° 2** : l'humain valide le verdict final (« approuvé » ou « approuvé avec réserves »). Ensuite seulement, push de la branche et ouverture de la PR.
+4. **Boucle de correction** : si le verdict est 🔁 à corriger ou ⛔ bloquant, l'agent principal vérifie le problème bloquant, relance le developer avec les retours, puis le reviewer. Au plus **3 tours** ; au-delà, ou si un retour contredit la spec ou demande un arbitrage produit, on s'arrête et on demande à l'humain.
+5. **Validation humaine n° 2** : l'humain valide le verdict final (✅ OK, éventuellement avec réserves). Ensuite seulement, push de la branche et ouverture de la PR.
 
 Entre les deux validations, l'agent principal ne s'arrête que pour un blocage réel : permission refusée, action réservée à l'humain, contradiction avec la spec.
