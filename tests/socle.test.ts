@@ -1,8 +1,9 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const root = process.cwd()
+const root = fileURLToPath(new URL('..', import.meta.url))
 
 function read(path: string): string {
   return readFileSync(join(root, path), 'utf8')
@@ -48,7 +49,7 @@ describe('Tailwind v3', () => {
 })
 
 describe('pas de blanc pur', () => {
-  const white = /#fff(?:fff)?\b|\b(?:bg|text|border|fill|stroke|from|to|via)-white\b|rgba?\(\s*255\s*,\s*255\s*,\s*255/i
+  const white = /#(?:f{3,4}|f{6}|f{8})\b|:\s*white\b|\b(?:bg|text|border|fill|stroke|from|to|via)-white\b|rgba?\(\s*255\s*,\s*255\s*,\s*255/i
   it.each(sourceFiles)('%s', (f) => {
     expect(read(f)).not.toMatch(white)
   })
