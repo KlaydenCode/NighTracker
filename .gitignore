@@ -1,0 +1,43 @@
+# Dépendances
+node_modules/
+
+# Nuxt
+.nuxt/
+.output/
+.data/
+.nitro/
+.cache/
+dist/
+
+# PWA générée
+dev-dist/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Environnement (ne jamais commiter)
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel/
+
+# Tests
+coverage/
+playwright-report/
+test-results/
+
+# Logs
+*.log
+
+# Claude Code : réglages locaux
+.claude/settings.local.json
+
+# Éditeurs / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
