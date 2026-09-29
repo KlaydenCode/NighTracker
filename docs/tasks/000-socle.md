@@ -1,6 +1,6 @@
 # 000 — Socle technique (Nuxt, Tailwind, PWA, Supabase, CI, Vercel)
 
-- **Statut** : prête
+- **Statut** : en revue
 - **Lot** : 0 (cf. SPEC §10)
 - **Références spec** : SPEC §4 (Stack), §6.2 (Règles UX, thème uniquement), §10 (Lots), §12 (Décisions Nuxt 4 et Tailwind v3), CLAUDE.md (Stack, Sécurité, Git)
 
@@ -278,9 +278,17 @@ Aucune migration dans ce lot (décision validée) : seulement `supabase/migratio
 
 ## 3. Implémentation (developer)
 
-- Branche :
+- Branche : `feat/000-socle`
 - Écarts par rapport au plan et pourquoi :
-- Résultat `lint` / `typecheck` / `test` :
+  - `vue` et `vue-router` installés avec `^` par npm (résolus en 3.5.43 et 5.3.1, plus récents que ceux du plan) ; conforme à la consigne « plage de Nuxt ».
+  - `nuxt.config.ts` : l'ordre des clés a été réorganisé par `eslint --fix` (règle `nuxt/nuxt-config-keys-order`), sans changement de contenu.
+  - `supabase/config.toml` : `site_url` mis à `http://localhost:3000` et `project_id` à `carnet-de-nuits` comme prévu ; le reste est la valeur par défaut de la CLI.
+  - Étape 6 du plan (push, PR, test CA20 sur GitHub) non faite : pas de push demandé.
+- Compatibilité modules avec Nuxt 4 (CA5) : `@nuxtjs/tailwindcss` 6.14.0, `@nuxtjs/supabase` 2.0.10 et `@vite-pwa/nuxt` 1.1.1 fonctionnent au build sans contournement. Seuls avertissements : le `console.warn` volontaire sur les variables Supabase absentes, et un `DeprecationWarning` Node (DEP0155) venant de `@nuxt/nitro-server`/`@vue/shared`, sans impact. Le SW est généré (20 entrées précachées) et `offline.html` est présent dans `sw.js`.
+- Vérifié localement : le build servi par `node .output/server/index.mjs` renvoie la page (lang fr, fond sombre inline, CSS Tailwind) et `manifest.webmanifest` (200). Icônes PNG contrôlées visuellement (fond sombre, pas de blanc).
+- Non vérifiable ici (vérification humaine) : CA1 sur clone neuf, CA7 à 360 px, CA11 à CA13 (téléphone, Lighthouse), CA14 (Docker absent), CA18 (requêtes réseau avec vrai `.env`), CA19 à CA25 (GitHub, Vercel).
+- Proposition (humain) : mettre à jour CLAUDE.md, `npm run typecheck` est `nuxt typecheck` et non `vue-tsc --noEmit`.
+- Résultat `lint` / `typecheck` / `test` : `lint` OK, `typecheck` OK, `test` 31 tests OK (2 fichiers), `build` OK.
 
 ## 4. Revue (reviewer)
 
