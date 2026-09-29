@@ -201,6 +201,7 @@ Règles d'affichage :
 ## 9. Hors-ligne et temps réel
 
 - Temps réel : abonnement Supabase Realtime sur `nights` et `night_wakings` du foyer.
+- Hors-ligne (lot 0, provisoire) : le service worker affiche un écran `offline.html` quand une navigation échoue sans réseau. Remplacé au lot 8 par une app qui s'ouvre hors ligne.
 - Hors-ligne (lot 8) : file d'attente locale (IndexedDB) des écritures, rejouée au retour du réseau. Conflit : dernier écrit gagne, par champ modifié.
 
 ## 10. Lots de livraison
@@ -228,7 +229,10 @@ Notifications, multi-enfants dans l'UI (le modèle le permet), comptes tiers, IA
 |---|---|---|
 | Âge de l'enfant | 18 mois au lancement | Tous les champs du §5 sont pertinents (dernier biberon, `biberon` dans `parent_actions`). Siestes utiles mais gardées au lot 9. L'âge affiché (PDF, réglages) est calculé depuis `children.birth_date`, jamais codé en dur. Aucun repère « normal pour l'âge » affiché (principe §2). |
 | Nuxt 3 ou 4 | **Nuxt 4** | Code applicatif sous `app/` (`app/pages`, `app/components`, `app/composables`, `app/utils`, `app/types`). `supabase/`, `public/` et `server/` restent à la racine. Vérifier la compatibilité Nuxt 4 de chaque module au lot 0 (`@nuxtjs/supabase`, `@vite-pwa/nuxt`, `@nuxtjs/tailwindcss`). |
-| Tailwind | **v3** via `@nuxtjs/tailwindcss` | Dépendance `tailwindcss@^3` épinglée. Aucune dépendance `@tailwindcss/vite`, `@tailwindcss/postcss` ni directive `@import "tailwindcss"`. |
+| Tailwind | **v3** via `@nuxtjs/tailwindcss` | Dépendance `tailwindcss@^3` épinglée. Aucune dépendance `@tailwindcss/vite`, `@tailwindcss/postcss` ni directive `@import "tailwindcss"`. Le module n'évolue plus (sa v7 vise Tailwind v4) : si un futur Nuxt le casse, rouvrir cette décision. |
+| Rendu | **SPA** (`ssr: false`) | Tout le rendu se fait dans le navigateur, à l'heure du téléphone (les serveurs Vercel sont en UTC). Prépare le hors-ligne du lot 8. |
+| Node / TypeScript | **Node 24** (`.nvmrc`, `engines`) · **TypeScript 5.9** | Nuxt 4.5 exige Node ≥ 24.11. TypeScript 7 est incompatible avec ESLint et `vue-tsc` : ne pas monter de version sans vérifier leur compatibilité. |
+| Clé Supabase côté client | Clé **publique** (`anon` ou `sb_publishable_…`) | Exposée via `NUXT_PUBLIC_SUPABASE_KEY`. Jamais de clé `service_role` / `sb_secret_…` côté client. |
 
 ## 13. Questions ouvertes
 

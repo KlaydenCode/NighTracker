@@ -12,7 +12,7 @@ Nuxt 4 · Vue 3 `<script setup lang="ts">` · TypeScript strict · Tailwind CSS 
 npm run dev          # serveur de dev
 npm run build        # build de prod
 npm run lint         # ESLint
-npm run typecheck    # vue-tsc --noEmit
+npm run typecheck    # nuxt typecheck (vue-tsc seul ne voit pas la structure Nuxt 4)
 npm run test         # Vitest
 npx supabase migration new <nom>   # nouvelle migration
 npx supabase db reset              # rejoue migrations + seed en local
@@ -20,6 +20,8 @@ npx supabase gen types typescript --local > app/types/database.ts
 ```
 
 Avant de déclarer une tâche finie : `lint`, `typecheck` et `test` doivent passer.
+
+Prérequis : Node 24 (`.nvmrc`), Docker Desktop (pour `supabase start` / `db reset`). Variables d'environnement (cf. `.env.example`) : `NUXT_PUBLIC_SUPABASE_URL`, `NUXT_PUBLIC_SUPABASE_KEY` (clé publique uniquement).
 
 ## Structure
 
