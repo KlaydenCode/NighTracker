@@ -1,0 +1,1 @@
+-- Données de développement fictives : ajoutées au lot 1 (jamais de données réelles).
