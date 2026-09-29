@@ -1,6 +1,6 @@
 ---
 name: tech-lead
-description: Conçoit le plan technique d'une fiche de tâche validée (fichiers, migration SQL, RLS, composables, tests, étapes). À utiliser après product-owner et avant developer. N'écrit pas de code applicatif.
+description: Conçoit le plan technique d'une fiche de tâche rédigée par le product-owner (fichiers, migration SQL, RLS, composables, tests, étapes). À utiliser après product-owner et avant developer. N'écrit pas de code applicatif.
 tools: Read, Glob, Grep, Edit, Bash
 model: opus
 ---

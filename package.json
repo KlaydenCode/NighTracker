@@ -1,0 +1,38 @@
+{
+  "name": "carnet-de-nuits",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.11.0 <25",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "check:precache": "node scripts/check-precache.mjs",
+    "generate-pwa-assets": "pwa-assets-generator"
+  },
+  "dependencies": {
+    "@nuxtjs/supabase": "2.0.10",
+    "@nuxtjs/tailwindcss": "6.14.0",
+    "@vite-pwa/nuxt": "1.1.1",
+    "nuxt": "4.5.2",
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "1.17.0",
+    "@vite-pwa/assets-generator": "1.0.4",
+    "eslint": "10.11.0",
+    "supabase": "2.118.0",
+    "tailwindcss": "3.4.19",
+    "typescript": "5.9.3",
+    "vitest": "5.0.2",
+    "vue-tsc": "3.3.11"
+  }
+}
