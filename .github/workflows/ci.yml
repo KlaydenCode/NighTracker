@@ -37,3 +37,25 @@ jobs:
         run: npm run build
       - name: Précache hors-ligne
         run: npm run check:precache
+
+  base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v5
+      - name: Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Installation
+        run: npm ci
+      - name: Base locale (migrations et seed)
+        run: npx supabase db start
+      - name: Tests de sécurité (pgTAP)
+        run: npx supabase test db
+      - name: Types à jour
+        run: |
+          npx supabase gen types typescript --local > "$RUNNER_TEMP/database.ts"
+          diff --strip-trailing-cr "$RUNNER_TEMP/database.ts" app/types/database.ts
