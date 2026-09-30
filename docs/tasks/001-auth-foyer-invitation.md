@@ -1245,5 +1245,31 @@ Lors d'un premier essai par `curl`, le `.env` local (qui pointe vers le projet S
 
 ## 4. Revue (reviewer)
 
-- **Verdict** : ✅ OK | 🔁 à corriger | ⛔ bloquant
-- Détail : voir le rapport de revue.
+### Tour 1 — 2026-09-30
+
+- **Verdict** : 🔁 à corriger (changements demandés). Aucun défaut de sécurité ; deux critères d'écran non tenus.
+- Contrôles relancés par le reviewer : `lint` ✅ · `typecheck` ✅ · `test` ✅ (12 fichiers, 240 tests) · `build` ✅ · `check:precache` ✅ (34 entrées) · `supabase db reset` ✅ · `supabase test db` ✅ (6 fichiers, 158 assertions, PASS) · `gen types` identique au fichier commité (`diff --strip-trailing-cr`) ✅.
+- Vérifié en plus contre l'API Auth **locale** (jamais le `.env`) : adresse inconnue → 403 sur `/otp` et sur `/signup`, aucune ligne dans `auth.users` ; adresse invitée saisie `Invite@Example.TEST` → 200, compte créé en minuscules ; « Create new user » (API d'administration) → accepté (CA17) ; « Send invitation » → refusé par le crochet ; session par code → `amr: [{"method":"otp"}]`, lit le foyer ; session par mot de passe du même compte → `amr: password`, zéro foyer, `update_my_membership` et `accept_invitation` → `not_authenticated` ; `hook_before_user_created` appelé par `anon` ou `authenticated` via l'API → 42501. Email reçu : code dans l'objet, lien `…?token_hash=…&type=email`.
+
+**Bloquants**
+- CA28 — `app/pages/bienvenue.vue:114` : après `invitation_not_found`, `load()` passe `mode` à `loading` puis `no_household` ; `errors.form` n'est rendu que dans les modes `create` et `invited`. Scénario : A annule l'invitation pendant que B est sur `/bienvenue` ; B touche « Rejoindre le foyer » et ne voit jamais « Cette invitation n'existe plus. », seulement « Chargement… » puis le texte de CA23. → Afficher le message aussi dans le mode `no_household` (ou ne pas l'effacer en rechargeant).
+- CA15 — `app/pages/login.vue:99-104` : « Renvoyer un code » attend la réponse de `requestCode` avant de rendre le bouton ; pour une adresse inconnue le crochet répond 403 aussitôt, pour une adresse autorisée Auth envoie l'email par SMTP Gmail avant de répondre. Scénario : quelqu'un qui teste l'adresse d'un parent voit « Envoi en cours… » durer nettement plus longtemps que pour une adresse inconnue : la durée d'attente et le comportement du bouton diffèrent, ce que CA15 exclut. Impact de sécurité réel nul (l'API elle-même distingue les deux cas, risque déjà accepté en section 2), mais le critère d'écran n'est pas tenu. → Appliquer au renvoi le même délai fixe de 1,5 s que le premier envoi, sans attendre la réponse (seul `offline` ramène à l'étape adresse).
+
+**À corriger**
+- `app/pages/reglages.vue:45` et `:402` : `canInvite` ne tient pas compte de `invitations.loaded` ; tant que l'invitation n'est pas chargée, le formulaire d'invitation s'affiche puis est remplacé par l'invitation en attente (CA27 : « le formulaire est remplacé »). Un « Inviter » touché dans l'intervalle est refusé par l'API, sans dégât. → N'afficher le formulaire qu'une fois `loaded` vrai.
+- `app/pages/index.vue:11-15` : « Réessayer » recharge l'état mais ne rejoue pas la redirection ; si le compte n'a en fait plus de foyer (`none`), la page reste sur « Pas de connexion ». → Après `refresh()`, naviguer vers `/` (le middleware tranche) ou vers `/bienvenue` si `none`.
+- `supabase/tests/database/02_rls.test.sql` (bloc « Session ouverte par mot de passe ») : seules `get_onboarding_state` et `invite_member` sont testées. → Ajouter `create_household`, `accept_invitation` et `update_my_membership` (vérifiées à la main ici, pas en test rejouable), et la forme `amr: ["password"]` prévue par `is_passwordless_session`.
+
+**Remarques (non bloquantes)**
+- Écarts déclarés en section 3, jugés acceptables : (8) le préambule `delete from public.households; delete from auth.users;` est annulé par le `rollback` de chaque fichier et nécessaire à cause des identifiants du seed ; à ne jamais lancer avec `supabase test db --linked` (le dire dans le README serait prudent) ; (8) le crochet testé en propriétaire : acceptable, `has_function_privilege` couvre les droits et l'appel réel par Auth a été rejoué ici ; (5) session écrite dans `useSupabaseSession()` : redondant (supabase-js notifie ses abonnés avant de rendre `verifyOtp`), sans risque ; (1), (2), (3), (4), (6), (7), (9), (10) : sans objection.
+- `hook_before_user_created` reste exécutable par `service_role` (droits par défaut de Supabase), en plus de `supabase_auth_admin`. Sans effet (rôle d'administration), mais `revoke execute … from service_role` alignerait le code sur « supabase_auth_admin seulement ».
+- `accept_invitation` traduit toute `unique_violation` en `role_taken`, y compris `household_members_user_key` (compte déjà membre d'un autre foyer) : inatteignable en V1 (un seul foyer), message trompeur le jour où plusieurs foyers existeront.
+- CA60 : `focus()` est appelé 1,5 s après la touche ; iOS n'ouvre généralement pas le clavier sur un focus programmatique hors geste. À constater sur iPhone (le champ est actif, le clavier peut demander une touche).
+- CA44 : `/bienvenue` utilise `min-h-dvh`, pas la hauteur visible (D15 limité à `/login` par le plan). Sur iPhone, clavier ouvert, « Créer le foyer » peut être masqué ; à constater à l'étape manuelle 7.
+- `CLAUDE.md` (ajout de `npx supabase test db`) est modifié dans `da5c4ee` alors que le plan réservait ce changement à l'humain ; à confirmer qu'il fait partie de ce que l'humain a validé.
+
+**Critères d'acceptation**
+- Couverts par un test automatique : CA5, CA6 (`email.test.ts`, pgTAP 04, crochet 06) ; CA7 (`cooldown.test.ts`) ; CA11, CA12, CA3 routage (`auth-routing.test.ts`) ; CA14, CA16 (pgTAP 06 + essai API local) ; CA19 (`validation.test.ts`, pgTAP 03) ; CA20 à CA22 (pgTAP 03) ; CA25 à CA27, CA29, CA31 à CA34 (pgTAP 04, 05) ; CA37, CA41, CA42 côté base (pgTAP 02) ; CA38 (`age.test.ts`, UTC et heure d'été) ; CA46 à CA51 (pgTAP 01, 02, 04, `migration.test.ts`) ; CA52 (`socle.test.ts`, grep du reviewer) ; CA53 (`migration.test.ts`, types régénérés identiques) ; CA57 message (`supabase-errors.test.ts`) ; CA58 (`otp-code.test.ts`) ; CA62, CA63 (pgTAP 05) ; CA54 ✅.
+- Non tenus : CA28 (message non affiché), CA15 (renvoi).
+- Vérification manuelle seule (pas de navigateur ici, listée en section 3) : CA1, CA2, CA4, CA8 à CA10, CA13, CA18, CA23, CA24, CA30, CA35, CA36, CA39, CA40, CA43 à CA45, CA56, CA59, CA60. Production (humain) : CA17 (préalable confirmé en local), CA61, CA64. CA55 : CI non exécutée (aucun push).
+- Aucun point ne contredit la spec ni ne demande d'arbitrage produit.
