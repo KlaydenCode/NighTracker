@@ -6,8 +6,6 @@ const session = useSupabaseSession()
 const visibleHeight = useVisibleHeight()
 const missing = missingSupabaseEnv(useRuntimeConfig().public.supabase)
 
-const NEUTRAL_DELAY_MS = 1500
-
 const step = ref<Step>('email')
 const email = ref('')
 const emailError = ref<string | null>(null)
@@ -31,11 +29,7 @@ const remaining = computed(() => remainingSeconds(sentAt.value, now.value))
 const resendLabel = computed(() =>
   resending.value ? 'Envoi en cours…' : remaining.value > 0 ? `Renvoyer dans ${remaining.value} s` : 'Renvoyer un code',
 )
-const containerStyle = computed(() => ({ height: visibleHeight.value ? `${visibleHeight.value}px` : '100dvh' }))
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
+const containerStyle = computed(() => visibleHeightStyle(visibleHeight.value))
 
 function startTimer(): void {
   now.value = Date.now()
@@ -81,14 +75,16 @@ async function submitEmail(): Promise<void> {
   const mine = ++attempt
   sending.value = true
   sentAt.value = Date.now()
-  void auth.requestCode(normalized).then(async (result) => {
-    if (result === 'offline' && mine === attempt) await goToEmailStep(errorMessage('network'))
-  })
   // Même écran, au même moment, quelle que soit l'adresse (l'app ne révèle pas qui est autorisé).
-  await sleep(NEUTRAL_DELAY_MS)
-  if (mine !== attempt) return
-  sending.value = false
-  await goToCodeStep()
+  await runWithNeutralDelay({
+    request: auth.requestCode(normalized),
+    isCurrent: () => mine === attempt,
+    onOffline: () => goToEmailStep(errorMessage('network')),
+    onDone: async () => {
+      sending.value = false
+      await goToCodeStep()
+    },
+  })
 }
 
 async function resend(): Promise<void> {
@@ -99,14 +95,16 @@ async function resend(): Promise<void> {
   resending.value = true
   sentAt.value = Date.now()
   now.value = sentAt.value
-  const result = await auth.requestCode(email.value)
-  if (mine !== attempt) return
-  resending.value = false
-  if (result === 'offline') {
-    await goToEmailStep(errorMessage('network'))
-    return
-  }
-  codeField.value?.focus()
+  // Même délai fixe que le premier envoi : la durée ne dépend pas de l'adresse.
+  await runWithNeutralDelay({
+    request: auth.requestCode(email.value),
+    isCurrent: () => mine === attempt,
+    onOffline: () => goToEmailStep(errorMessage('network')),
+    onDone: () => {
+      resending.value = false
+      codeField.value?.focus()
+    },
+  })
 }
 
 async function changeAddress(): Promise<void> {
