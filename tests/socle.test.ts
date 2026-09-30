@@ -74,6 +74,35 @@ describe('pas de secret', () => {
   })
 })
 
+describe('pas de clé service_role ni d\'identifiant SMTP (CA52)', () => {
+  const forbiddenKeys = /service_role|serviceKey|secretKey|serverSupabaseServiceRole|SUPABASE_SERVICE|sb_secret_/
+  const codeFiles = [
+    ...sourceFiles,
+    ...listFiles('supabase/migrations', ['.sql']),
+    ...listFiles('supabase/templates', ['.html']),
+    ...listFiles('supabase/tests', ['.sql']),
+    'supabase/seed.sql',
+  ].filter(f => existsSync(join(root, f)))
+
+  it.each(codeFiles)('%s ne mentionne aucune clé secrète', (f) => {
+    expect(read(f)).not.toMatch(forbiddenKeys)
+  })
+
+  const configFiles = [
+    'README.md',
+    '.env.example',
+    'nuxt.config.ts',
+    'supabase/config.toml',
+    '.github/workflows/ci.yml',
+  ].filter(f => existsSync(join(root, f)))
+
+  it.each(configFiles)('%s ne contient ni adresse Gmail ni mot de passe SMTP', (f) => {
+    const text = read(f)
+    expect(text).not.toMatch(/@gmail\.com/i)
+    expect(text).not.toMatch(/^\s*pass\s*=/m)
+  })
+})
+
 describe('hors-ligne', () => {
   it('offline.html est en français et sans script', () => {
     const html = read('public/offline.html')
