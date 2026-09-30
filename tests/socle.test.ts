@@ -76,16 +76,25 @@ describe('pas de secret', () => {
 
 describe('pas de clé service_role ni d\'identifiant SMTP (CA52)', () => {
   const forbiddenKeys = /service_role|serviceKey|secretKey|serverSupabaseServiceRole|SUPABASE_SERVICE|sb_secret_/
-  const codeFiles = [
-    ...sourceFiles,
+  // En SQL, `service_role` n'est que le nom d'un rôle (la migration lui retire des droits) : seules
+  // les clés et variables qui la portent restent interdites.
+  const forbiddenSqlKeys = /serviceKey|secretKey|serverSupabaseServiceRole|SUPABASE_SERVICE|sb_secret_/
+  const sqlFiles = [
     ...listFiles('supabase/migrations', ['.sql']),
-    ...listFiles('supabase/templates', ['.html']),
     ...listFiles('supabase/tests', ['.sql']),
     'supabase/seed.sql',
+  ].filter(f => existsSync(join(root, f)))
+  const codeFiles = [
+    ...sourceFiles,
+    ...listFiles('supabase/templates', ['.html']),
   ].filter(f => existsSync(join(root, f)))
 
   it.each(codeFiles)('%s ne mentionne aucune clé secrète', (f) => {
     expect(read(f)).not.toMatch(forbiddenKeys)
+  })
+
+  it.each(sqlFiles)('%s ne mentionne aucune clé secrète (SQL)', (f) => {
+    expect(read(f)).not.toMatch(forbiddenSqlKeys)
   })
 
   const configFiles = [

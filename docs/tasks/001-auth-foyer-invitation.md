@@ -1243,6 +1243,21 @@ Lors d'un premier essai par `curl`, le `.env` local (qui pointe vers le projet S
 - Suggestion `CLAUDE.md` (réservée à l'humain) : ajouter `npx supabase test db` aux commandes.
 - `fetchWithRetry` du module Supabase réessaie trois fois avant d'échouer : sans réseau, « Pas de connexion » peut apparaître quelques centaines de millisecondes plus tard.
 
+### Corrections du tour 1 de revue
+
+1. **CA28** : `/bienvenue` affiche `errors.form` aussi en mode `no_household` ; `load()` ne l'efface pas, donc après `invitation_not_found` B voit « Cette invitation n'existe plus. » au-dessus du texte de CA23.
+2. **CA15** : `resend()` et `submitEmail()` passent par la même fonction pure `runWithNeutralDelay` (`app/utils/neutral-delay.ts`, testée dans `neutral-delay.test.ts`) : requête lancée sans être attendue, délai fixe de 1,5 s, garde `attempt`, retour à l'étape adresse seulement sur `offline`.
+3. **`/reglages`** : formulaire d'invitation et message « deux rôles pris » conditionnés par `invitations.loaded` (remis à faux au chargement et à la déconnexion).
+4. **`/` (« Réessayer »)** : après `refresh()`, si l'état est `none`, navigation vers `/bienvenue`.
+5. **pgTAP 02** : sessions par mot de passe testées aussi sur `create_household`, `accept_invitation`, `update_my_membership`, et la forme `amr: ["password"]` (zéro foyer, `is_household_member` faux, `get_onboarding_state` refusée). 6 assertions de plus (55).
+6. **Crochet** : la migration retire l'exécution de `hook_before_user_created` à `service_role` (fichier existant modifié : jamais appliqué au distant) ; assertion pgTAP ajoutée dans 06 (10). Écart de test : le garde de `tests/socle.test.ts` (CA52) interdisait le mot `service_role` dans le SQL ; pour le SQL il n'interdit plus que les clés et variables (`serviceKey`, `sb_secret_`, etc.), le mot restant interdit partout ailleurs. Le nom d'un rôle n'est pas une clé.
+7. **README** : précise que les tests pgTAP vident `public.households` et `auth.users` dans une transaction annulée, et interdit `supabase test db --linked`.
+8. **CA44** : `/bienvenue` suit `useVisibleHeight()` comme `/login`, via `visibleHeightStyle` (`app/utils/viewport.ts`, testé) partagé par les deux pages (`min-height` sur `/bienvenue`).
+
+À constater sur iPhone à l'étape manuelle 7 (non corrigé, hors de ce tour) : le focus différé du champ du code (CA60), appelé 1,5 s après la touche, peut ne pas ouvrir le clavier. Non traité : le message `role_taken` d'`accept_invitation` pour un compte déjà membre (inatteignable en V1).
+
+Résultats réels après ces corrections : `npm run lint` passe ; `npm run typecheck` passe ; `npm run test` 14 fichiers, 252 tests (idem `TZ=UTC`) ; `npx supabase db reset` puis `npx supabase test db` : 6 fichiers, 165 assertions, PASS ; `npm run build` passe (`check:precache` : 35 entrées) ; `database.ts` identique à une régénération. Aucun essai n'a utilisé le `.env` : seule l'instance locale a été sollicitée.
+
 ## 4. Revue (reviewer)
 
 ### Tour 1 — 2026-09-30

@@ -81,7 +81,7 @@ npx supabase start        # ou : npx supabase db start
 npx supabase test db      # supabase/tests/database/*.test.sql
 ```
 
-Ils vérifient la RLS, les fonctions d'invitation, les rôles et le crochet d'inscription. Ils ne tournent pas dans `npm run test` (Docker requis) ; la CI les exécute dans le job `base`.
+Ils vérifient la RLS, les fonctions d'invitation, les rôles et le crochet d'inscription. Chaque fichier commence par vider `public.households` et `auth.users` (le seed fait place nette) dans une transaction annulée par un `rollback` : **ne jamais lancer `npx supabase test db --linked`**, qui viserait le projet distant. Ils ne tournent pas dans `npm run test` (Docker requis) ; la CI les exécute dans le job `base`.
 
 ### Étapes manuelles du lot 1 (à faire par l'humain)
 
