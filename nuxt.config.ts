@@ -78,8 +78,20 @@ export default defineNuxtConfig({
   supabase: {
     url: supabaseUrl,
     key: supabaseKey,
+    // Redirections : middleware maison (app/middleware/auth.global.ts).
     redirect: false,
-    types: false,
+    // Session dans localStorage, flux implicite : aucun jeton envoyé à Vercel.
+    useSsrCookies: false,
+    clientOptions: {
+      auth: {
+        flowType: 'implicit',
+        persistSession: true,
+        autoRefreshToken: true,
+        // Le lien de l'email est vérifié par /confirm, rien à lire dans l'URL.
+        detectSessionInUrl: false,
+      },
+    },
+    types: '~/types/database.ts',
   },
   tailwindcss: { viewer: false },
 })
