@@ -87,6 +87,7 @@ export function useAuth() {
     clearPendingLogin()
     household.reset()
     invitations.pending.value = null
+    invitations.loaded.value = false
     await navigateTo('/login', { replace: true })
     return 'done'
   }

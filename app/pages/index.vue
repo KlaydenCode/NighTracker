@@ -12,6 +12,8 @@ async function retry(): Promise<void> {
   loading.value = true
   await household.refresh()
   loading.value = false
+  // Le compte n'a peut-être plus de foyer : la redirection est rejouée.
+  if (state.value.status === 'none') await navigateTo('/bienvenue', { replace: true })
 }
 </script>
 

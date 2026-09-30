@@ -42,7 +42,13 @@ const others = computed(() => state.value.members.filter(m => m.user_id !== stat
 const freeRoles = computed<ParentRole[]>(() =>
   (['maman', 'papa'] as const).filter(r => !state.value.members.some(m => m.role === r)),
 )
-const canInvite = computed(() => !invitations.pending.value && freeRoles.value.length > 0)
+// Tant que l'invitation en attente n'est pas chargée, ni formulaire ni message.
+const canInvite = computed(() =>
+  invitations.loaded.value && !invitations.pending.value && freeRoles.value.length > 0,
+)
+const allRolesTaken = computed(() =>
+  invitations.loaded.value && !invitations.pending.value && freeRoles.value.length === 0,
+)
 const onlyRole = computed(() => (freeRoles.value.length === 1 ? freeRoles.value[0] : undefined))
 const ageText = computed(() =>
   state.value.child ? formatAge(state.value.child.birth_date, today) : '',
@@ -167,6 +173,7 @@ async function signOut(): Promise<void> {
 
 async function load(): Promise<void> {
   loadError.value = null
+  invitations.loaded.value = false
   await household.refresh()
   if (state.value.status === 'error') {
     loadError.value = errorMessage('network')
@@ -430,7 +437,7 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
       </form>
 
       <p
-        v-else
+        v-else-if="allRolesTaken"
         class="text-slate-300"
       >
         Les deux rôles du foyer sont pris : aucune invitation à envoyer.

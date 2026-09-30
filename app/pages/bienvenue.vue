@@ -5,6 +5,9 @@ type Mode = 'loading' | 'create' | 'invited' | 'no_household' | 'error'
 
 const household = useHousehold()
 const auth = useAuth()
+// Le clavier peut recouvrir le bas de la page sur iOS : le pied suit la zone visible (comme /login).
+const visibleHeight = useVisibleHeight()
+const containerStyle = computed(() => visibleHeightStyle(visibleHeight.value, 'minHeight'))
 
 const mode = ref<Mode>('loading')
 const onboarding = ref<OnboardingState | null>(null)
@@ -124,7 +127,10 @@ onMounted(load)
 </script>
 
 <template>
-  <main class="flex min-h-dvh flex-col px-6 pt-8">
+  <main
+    class="flex flex-col px-6 pt-8"
+    :style="containerStyle"
+  >
     <h1 class="text-2xl font-semibold">
       Bienvenue
     </h1>
@@ -252,6 +258,13 @@ onMounted(load)
     </form>
 
     <template v-else>
+      <p
+        v-if="errors.form"
+        role="alert"
+        class="mt-6 text-rose-300"
+      >
+        {{ errors.form }}
+      </p>
       <p class="mt-6 text-slate-200">
         Aucun foyer n'est associé à cette adresse. Demandez à l'autre parent de vous inviter avec l'adresse que vous utilisez ici.
       </p>
