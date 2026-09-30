@@ -2,7 +2,7 @@
 -- A (maman) et B (papa) sont membres ; C est un compte connecté sans foyer.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(49);
+select plan(55);
 
 -- Repart d'une base vide : le seed (foyer et comptes fictifs) est retiré, puis tout est annulé par le rollback.
 delete from public.households;
@@ -40,6 +40,16 @@ begin
   execute p_sql;
   get diagnostics v_rows = row_count;
   return v_rows;
+end $$;
+
+-- Même session, avec la forme « amr: ["password"] » (liste de chaînes).
+create function tests.login_amr_strings(p_uid uuid, p_email text)
+returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', p_uid, 'email', p_email, 'role', 'authenticated',
+    'amr', json_build_array('password'))::text, true);
+  perform set_config('role', 'authenticated', true);
 end $$;
 
 grant execute on all functions in schema tests to authenticated, anon;
@@ -158,6 +168,21 @@ select throws_ok($$ select public.get_onboarding_state() $$, 'P0001', 'not_authe
   'mot de passe : get_onboarding_state refusée');
 select throws_ok($$ select public.invite_member('x@example.test', 'papa') $$, 'P0001', 'not_authenticated',
   'mot de passe : invite_member refusée');
+select throws_ok($$ select public.create_household('Intrus', '2025-03-15', 'maman', 'Maman') $$, 'P0001', 'not_authenticated',
+  'mot de passe : create_household refusée');
+select throws_ok($$ select public.accept_invitation('Intrus') $$, 'P0001', 'not_authenticated',
+  'mot de passe : accept_invitation refusée');
+select throws_ok($$ select public.update_my_membership('Piraté', 'maman') $$, 'P0001', 'not_authenticated',
+  'mot de passe : update_my_membership refusée');
+select tests.logout();
+
+-- Forme « amr: ["password"] » (liste de chaînes) : même refus.
+select tests.login_amr_strings('00000000-0000-4000-8000-0000000000a1', 'maman@example.test');
+select is((select count(*) from public.households), 0::bigint, 'mot de passe (amr en chaînes) : zéro foyer');
+select is(public.is_household_member('00000000-0000-4000-8000-000000000001'), false,
+  'mot de passe (amr en chaînes) : is_household_member est faux');
+select throws_ok($$ select public.get_onboarding_state() $$, 'P0001', 'not_authenticated',
+  'mot de passe (amr en chaînes) : get_onboarding_state refusée');
 select tests.logout();
 
 select * from finish();

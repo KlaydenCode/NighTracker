@@ -452,7 +452,7 @@ revoke all on function
   public.accept_invitation(text),
   public.update_my_membership(text, public.caregiver),
   public.hook_before_user_created(jsonb)
-  from public, anon, authenticated;
+  from public, anon, authenticated, service_role;
 
 grant execute on function
   public.is_household_member(uuid),

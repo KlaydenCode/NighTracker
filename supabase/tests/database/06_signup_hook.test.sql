@@ -1,7 +1,7 @@
 -- Crochet « before user created » : seule une adresse invitée obtient un compte (CA14, CA16).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(9);
+select plan(10);
 
 -- Repart d'une base vide : le seed (foyer et comptes fictifs) est retiré, puis tout est annulé par le rollback.
 delete from public.households;
@@ -43,7 +43,10 @@ select is(public.hook_before_user_created('{"user": {"email": "papa@example.test
 select ok(has_function_privilege('supabase_auth_admin', 'public.hook_before_user_created(jsonb)', 'execute'),
   'supabase_auth_admin peut exécuter le crochet');
 
-select ok(not has_function_privilege('authenticated', 'public.hook_before_user_created(jsonb)', 'execute'),
+select ok(not has_function_privilege('service_role', 'public.hook_before_user_created(jsonb)', 'execute'),
+  'service_role ne peut pas exécuter le crochet (supabase_auth_admin seulement)');
+
+select ok(not has_function_privilege('authenticated','public.hook_before_user_created(jsonb)', 'execute'),
   'authenticated ne peut pas exécuter le crochet');
 
 select * from finish();
