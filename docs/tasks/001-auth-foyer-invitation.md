@@ -1288,3 +1288,41 @@ Résultats réels après ces corrections : `npm run lint` passe ; `npm run typec
 - Non tenus : CA28 (message non affiché), CA15 (renvoi).
 - Vérification manuelle seule (pas de navigateur ici, listée en section 3) : CA1, CA2, CA4, CA8 à CA10, CA13, CA18, CA23, CA24, CA30, CA35, CA36, CA39, CA40, CA43 à CA45, CA56, CA59, CA60. Production (humain) : CA17 (préalable confirmé en local), CA61, CA64. CA55 : CI non exécutée (aucun push).
 - Aucun point ne contredit la spec ni ne demande d'arbitrage produit.
+
+### Tour 2 — 2026-09-30
+
+- **Verdict** : ✅ OK, approuvé avec réserves (réserves = vérifications humaines hors de portée des agents : parcours d'écran et téléphone listés au tour 1, CA17, CA61, CA64, étapes manuelles 1 à 7, CI GitHub).
+- Commits relus : `ff6a8fa` (revue du tour 1, telle quelle), `cf1701a`, `29e360d`, `fa50fc4`, `85c7aea`.
+- Contrôles relancés par le reviewer : `lint` ✅ · `typecheck` ✅ · `test` ✅ (14 fichiers, 252 tests) · `build` ✅ · `check:precache` ✅ (35 entrées) · `supabase db reset` ✅ · `supabase test db` ✅ (6 fichiers, 165 assertions, PASS) · `gen types` identique au fichier commité ✅.
+- Contre l'API Auth **locale** seulement : après la révocation, le crochet ne reste exécutable que par `supabase_auth_admin` (vérifié dans `pg_proc`) et fonctionne toujours : adresse inconnue → 403, adresse invitée en casse différente → 200, compte créé.
+
+**Constats du tour 1**
+- Bloquant CA28 : **levé**. `app/pages/bienvenue.vue:261-267` affiche `errors.form` en mode `no_household`, et `load()` ne l'efface pas : après `invitation_not_found`, B voit « Cette invitation n'existe plus. » au-dessus du texte de CA23.
+- Bloquant CA15 : **levé**. `submitEmail()` et `resend()` (`app/pages/login.vue:79-87`, `:99-107`) passent par `runWithNeutralDelay` (`app/utils/neutral-delay.ts`). La requête n'est pas attendue et l'écran change à 1,5 s pour toute adresse. Une réponse `sent` tardive ne fait rien ; seul `offline` agit, et seulement si la demande est toujours la demande courante (`attempt`), ce qui ne dépend pas de l'adresse. Une demande abandonnée (« Changer d'adresse », démontage) ne peut plus toucher l'écran. Ces cas sont couverts par `neutral-delay.test.ts` : réponse avant ou après le délai, `offline`, demande abandonnée.
+- À corriger `reglages.vue` : **levé**. Le formulaire et le message « deux rôles pris » attendent `invitations.loaded` (`:45-51`) ; `loaded` est remis à faux au chargement (`:176`) et à la déconnexion (`useAuth.ts:90`). Après « Annuler l'invitation », `loaded` reste vrai et le formulaire réapparaît (CA28).
+- À corriger `index.vue` : **levé** (`:15-16`). L'état `none` renvoie vers `/bienvenue`, et l'état `member` réaffiche l'accueil.
+- À corriger pgTAP 02 : **levé**. Les assertions ajoutées testent bien ce qu'elles annoncent :
+  - pour A, membre et confirmé, sans la garde `amr`, `create_household` répondrait `household_exists`, `accept_invitation` rendrait le foyer sans erreur et `update_my_membership` réussirait ;
+  - la forme `amr: ["password"]` testée sur un compte membre donnerait sinon 1 foyer ;
+  - pgTAP 06 : l'assertion `service_role` était fausse avant `cf1701a`.
+- Remarques traitées : révocation du crochet pour `service_role` ✅ ; avertissement `--linked` dans le README ✅ ; `/bienvenue` suit `visualViewport` (`visibleHeightStyle`, testé) ✅.
+- Remarques laissées, acceptées : message `role_taken` d'`accept_invitation` (inatteignable en V1) ; focus différé de CA60, à constater sur iPhone.
+
+**Garde CA52 assouplie (`tests/socle.test.ts:77-98`) : pas de trou**
+- Essayée sur des chaînes réelles (clés de l'instance locale, sans rien écrire dans le dépôt) :
+  - une clé `service_role` au format JWT placée dans du SQL est toujours détectée par le bloc « pas de secret » (`:58-69`, qui couvre `supabase/**/*.sql` et `*.toml`) ;
+  - `sb_secret_` est détecté par les deux blocs.
+- Le mot `service_role` reste interdit dans le code client (`app/`, `nuxt.config.ts`, `tailwind.config.ts`, `public/`) et les gabarits. Il n'a jamais été interdit dans `config.toml` ni `.env.example`, qui le portent en commentaire.
+- `git grep` de clés JWT et `sb_secret_` sur tout l'arbre : aucune occurrence.
+
+**Nouveaux constats**
+- Aucun bloquant, aucun « à corriger ».
+- Remarque : la migration `20260930155139_auth_household.sql:455` a été modifiée en place. C'est acceptable seulement parce qu'elle n'a jamais été appliquée au distant (étape manuelle 2 non faite, d'après la section 3). L'humain doit le confirmer avant `db push` ; sinon, il faut une nouvelle migration.
+- Remarque, préexistante et non introduite par ce tour : le motif JWT de « pas de secret » ne parcourt ni `supabase/templates/`, ni `README.md`, ni `scripts/`, ni `tests/`, ni `docs/`. Suggestion : balayer tous les fichiers suivis (`git ls-files`) avec ce motif.
+- Remarque : `/bienvenue` utilise `min-height`. Si le formulaire de création dépasse la zone visible clavier ouvert, « Créer le foyer » demande un défilement. CA44 reste à constater sur iPhone.
+- Remarque reportée du tour 1 : ajout de `npx supabase test db` dans `CLAUDE.md` (`da5c4ee`), à confirmer par l'humain.
+
+**Critères d'acceptation**
+- CA15 et CA28 : ✅ dans le code (le rendu reste à constater à la main).
+- Les autres critères sont inchangés depuis le tour 1 (voir la liste de couverture ci-dessus).
+- Aucun point ne contredit la spec ni ne demande d'arbitrage produit.
