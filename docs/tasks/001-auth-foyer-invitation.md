@@ -1,6 +1,6 @@
 # 001 — Authentification par lien magique, foyer, enfant, invitation
 
-- **Statut** : prête
+- **Statut** : en revue
 - **Lot** : 1 (cf. SPEC §10)
 - **Références spec** : SPEC §2 (données sensibles), §3 (Utilisateurs), §4 (Auth, tests), §5.1 (enum `caregiver`), §5.2 (`households`, `household_members`, `children`), §5.4 (RLS, `is_household_member()`, `household_invitations`), §6 (`/login`, `/reglages`), §6.2 (règles UX), §10 (lots 1 et 9), §11 (hors périmètre : comptes tiers), §12 (SPA, clé publique, âge calculé, décisions ajoutées), CLAUDE.md (Sécurité)
 
@@ -1188,9 +1188,60 @@ Suggestion hors spec, pour `CLAUDE.md` (réservée à l'humain) : ajouter `npx s
 
 ## 3. Implémentation (developer)
 
-- Branche :
-- Écarts par rapport au plan et pourquoi :
-- Résultat `lint` / `typecheck` / `test` :
+- Branche : `feat/001-auth-foyer-invitation` (commits locaux, rien de poussé).
+- Commits : `docs(auth)` (fiche, spec, CLAUDE.md) ; `feat(base)` (migration, seed, config, gabarits, types générés, ESLint) ; `feat(auth)` (fonctions pures et leurs tests) ; `test(base)` (pgTAP, garde de migration, extension de `socle.test.ts`, job CI `base`) ; `feat(auth)` (connexion, routes, middleware, composables, composants) ; `feat(foyer)` (`/bienvenue`, `/`, `/reglages`, README) ; `docs(auth)` (cette section).
+- Ce qui a été fait : tout le plan de la section 2, dans l'ordre des « Étapes d'implémentation ». La migration, le seed et les gabarits d'email sont extraits tels quels de la section 2 (aucun changement de SQL). Six fichiers pgTAP, `tests/migration.test.ts`, extension de `tests/socle.test.ts`, neuf fichiers de `app/utils/` avec leurs tests (huit prévus, plus `format.ts`), quatre composables, le middleware, cinq composants, les pages `/login`, `/confirm`, `/bienvenue`, `/`, `/reglages`, le job CI `base` et le README.
+
+### Écarts par rapport au plan et pourquoi
+
+1. **`app/utils/format.ts` (+ test) ajouté** : `roleLabel` et `formatDateFr` (date de l'invitation, libellés de rôle), utilisés par `/bienvenue` et `/reglages`. Pure, testée, sans dépendance. Non prévu dans la liste des fichiers.
+2. **`app/types/app.ts` ajouté** : types partagés des composables (`HouseholdState`, `ActionResult`, `ParentRole`…). Le plan ne nommait pas de fichier de types.
+3. **`errorToken` : quelques correspondances de plus** que la table du plan : `42501` et `PGRST116` (écriture refusée ou ne touchant aucune ligne) donnent `not_allowed` ; `23514`, `22007`, `22008` (contrainte de colonne) donnent `invalid_input`. Sans elles, un refus de la RLS lors de `updateHouseholdName` ou `updateChild` aurait affiché le message générique. Testées.
+4. **`AppField`** : prop `inputClass` ajoutée (classes du champ, pour les grands chiffres du code) ; `class` et `style` habillent le conteneur, tout le reste va sur le champ. Le plan disait seulement « libellé, champ, message ».
+5. **`useAuth.verifyCode` et `verifyLink`** écrivent la session dans `useSupabaseSession()` dès la réponse, sans attendre l'événement d'authentification, pour que le middleware de la navigation qui suit voie la session. Non prévu, sans effet sur les critères.
+6. **`useAuth.requestCode`** efface l'état « code demandé » lui-même en cas d'échec réseau (le plan le faisait faire à la page) ; la page l'efface aussi.
+7. **`resolveAuthRedirect`** : une session avec `membership: null` est traitée comme `error` (cas non prévu par le plan, jamais atteint par le middleware).
+8. **Tests pgTAP** : chaque fichier commence par `delete from public.households; delete from auth.users;` (et non le seul foyer), car les comptes du seed portent les mêmes identifiants et adresses que ceux des tests ; tout est annulé par le `rollback`. Le crochet est testé en propriétaire de la fonction : `postgres` ne peut pas prendre le rôle `supabase_auth_admin`, donc l'appel réel sous ce rôle est couvert par `has_function_privilege` (pgTAP) et par l'essai manuel sur l'instance locale (voir plus bas). Les écritures « zéro ligne touchée » passent par une fonction d'aide `tests.affected(sql)` (une CTE de modification ne peut pas être imbriquée dans `select is(...)`). Décomptes : 17, 49, 25, 34, 24 et 9 assertions (158 au total).
+9. **Test « gabarits »** de `tests/migration.test.ts` : vérifie aussi que `config.toml` référence les deux gabarits.
+10. **`README.md`** : ajoute une phrase de prudence : le `.env` habituel peut pointer vers le projet distant ; pour les essais locaux, y mettre l'URL et la clé publique locales.
+
+### Résultats réels des commandes (dernière exécution, après `npx supabase db reset` propre)
+
+| Commande | Résultat |
+|---|---|
+| `npm run lint` | passe, sans avertissement |
+| `npm run typecheck` | passe |
+| `npm run test` | 12 fichiers, 240 tests passés ; idem avec `TZ=UTC` |
+| `npx supabase test db` | 6 fichiers, 158 assertions, `Result: PASS` |
+| `npm run build` | passe ; `npm run check:precache` : `offline.html` précaché (34 entrées) |
+| `gen types` | `app/types/database.ts` identique à une régénération (comparaison faite à la main, comme le fera le job CI) |
+
+### Tests non exécutés dans `npm run test` et manière de les rejouer
+
+- pgTAP (CA46 à CA51, CA62, CA63, crochet) : Docker requis. `npx supabase start` (ou `npx supabase db start`), puis `npx supabase test db`. La CI les exécute dans le job `base` (non exécuté : aucun push).
+- Types à jour (CA53) : `npx supabase gen types typescript --local > "$TMP/database.ts"` puis `diff --strip-trailing-cr "$TMP/database.ts" app/types/database.ts` (depuis Git Bash).
+
+### Vérifié à la main sur l'instance locale (script Node contre l'API Supabase réelle, sans navigateur)
+
+Après `truncate public.households cascade` : adresse inconnue refusée par le crochet (403 « Signups not allowed » sur `/otp` et sur `/signup`, aucune ligne dans `auth.users`, aucun email) ; compte du seed : email reçu dans la boîte de test avec le code dans l'objet et le lien vers `/confirm?token_hash=…` ; connexion par code (jeton `amr: otp`) ; `create_household` puis lecture en une requête du foyer, de l'enfant et des membres (celle de `useHousehold`) ; invitation en rôle `autre` refusée (`role_not_allowed`) ; invitation en rôle libre acceptée, adresse normalisée ; invité : compte créé par le crochet, connexion par le lien (`verifyOtp` avec `token_hash`), lien rejoué et code du même email après le lien refusés (403 `otp_expired`) ; état `invited` avec nom du foyer et rôle ; `accept_invitation` deux fois sans erreur ni doublon ; les deux comptes lisent le même foyer ; nom modifié par A lu par B ; changement de rôle vers le rôle réservé refusé.
+
+### Ce qui n'a pas pu être vérifié (aucun navigateur ni téléphone dans cet environnement) : à faire à la main
+
+- Rendu et parcours d'écran : CA1, CA2 (message, champ du code, « Changer d'adresse »), CA5, CA7 (compte à rebours), CA10 (réseau coupé, variables absentes), CA18 à CA21, CA23 à CA25, CA28, CA30 à CA32, CA35 à CA41, CA43 à CA45, CA56 à CA60 : tableau « Tests prévus », lignes « Manuel ». Les règles sous-jacentes (validation, âge, redirections, messages) sont couvertes par Vitest ; le câblage des pages ne l'est pas.
+- Mise en page à 360 px, cibles de 48 px, absence de défilement horizontal, clavier numérique ouvert, hauteur suivant `visualViewport` (D15), sélecteur de date et champs préremplis sur fond sombre : DevTools puis vrai téléphone. Le test statique « pas de blanc pur » passe sur tous les nouveaux fichiers.
+- CA8 (session persistante après fermeture), CA9 (retour arrière après déconnexion), CA11 (aucune requête `/rest/v1/` sans session : le middleware ne charge le foyer qu'avec une session, à constater dans l'onglet Réseau), CA13 (`offline.html`).
+- CA17, CA61, CA64 et les étapes manuelles 1 à 7 : production, réservées à l'humain.
+- Crochet sous le rôle réel `supabase_auth_admin` sur le projet distant, et forme de `amr` en production : étapes 6 et 7.
+- CI GitHub (jobs `verifier` et `base`) : non exécutée (aucun push). Le comportement de `supabase db start` sur le runner reste supposé.
+
+### Incident à signaler
+
+Lors d'un premier essai par `curl`, le `.env` local (qui pointe vers le projet Supabase **distant**, pas vers l'instance locale) a été chargé par erreur : trois requêtes d'authentification (`/auth/v1/otp` deux fois, `/auth/v1/signup` une fois) avec des adresses fictives en `@example.test` ont été envoyées au projet distant (réponses 400 « adresse invalide » et 429 ; aucun compte ni email n'a pu être créé pour ces adresses, mais un contrôle dans Authentication > Users est possible). Aucun secret n'a été lu ni écrit, le `.env` n'a pas été modifié. Tous les essais suivants ont utilisé exclusivement l'URL locale.
+
+### Améliorations repérées, non codées
+
+- Suggestion `CLAUDE.md` (réservée à l'humain) : ajouter `npx supabase test db` aux commandes.
+- `fetchWithRetry` du module Supabase réessaie trois fois avant d'échouer : sans réseau, « Pas de connexion » peut apparaître quelques centaines de millisecondes plus tard.
 
 ## 4. Revue (reviewer)
 
