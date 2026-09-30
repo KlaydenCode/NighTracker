@@ -16,6 +16,7 @@ npm run typecheck    # nuxt typecheck (vue-tsc seul ne voit pas la structure Nux
 npm run test         # Vitest
 npx supabase migration new <nom>   # nouvelle migration
 npx supabase db reset              # rejoue migrations + seed en local
+npx supabase test db               # tests pgTAP (RLS et fonctions SQL)
 npx supabase gen types typescript --local > app/types/database.ts
 ```
 

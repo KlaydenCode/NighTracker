@@ -23,8 +23,8 @@ Objectifs :
 ## 3. Utilisateurs
 
 - 2 parents (rôles d'affichage : Maman, Papa), chacun avec son compte.
-- Un **foyer** regroupe les parents et l'enfant. Pas d'inscription publique : accès sur invitation.
-- Tiers éventuels (grand-parent, nounou) : hors périmètre V1, mais le modèle prévoit la valeur `autre`.
+- Un **foyer** regroupe les parents et l'enfant. Pas d'inscription publique : aucun compte ne peut être créé sans autorisation. Le premier parent est créé par le porteur du projet dans Supabase ; le second est invité depuis `/reglages`. En V1, l'app est mono-famille : un seul foyer par installation, un utilisateur n'appartient qu'à un seul foyer, et Maman et Papa sont chacun uniques dans le foyer.
+- **Nounou** (lot 9) : invitée par les parents avec le rôle `autre` et des droits limités. Elle n'accède qu'à la saisie des informations liées à son activité de la journée (siestes) ; elle ne voit ni les nuits, ni le bilan, ni les réglages du foyer. Le modèle n'interdit pas ce rôle (aucun plafond de membres), mais aucune invitation de tiers n'est proposée avant le lot 9. Autres tiers (grand-parent) : hors périmètre V1.
 
 ## 4. Stack
 
@@ -33,9 +33,9 @@ Objectifs :
 | Front | **Nuxt 4** (structure `app/`), Vue 3 `<script setup lang="ts">`, TypeScript strict |
 | UI | **Tailwind CSS v3** via le module `@nuxtjs/tailwindcss` (config `tailwind.config.ts`), mode sombre par défaut. Pas de Tailwind v4 ni de `@tailwindcss/vite` : ne jamais mélanger les deux. |
 | PWA | `@vite-pwa/nuxt` (installable, icône, écran hors-ligne) |
-| Back / BDD | Supabase : Postgres, Auth (lien magique), Realtime, RLS |
+| Back / BDD | Supabase : Postgres, Auth (code à 6 chiffres ou lien magique, reçus par email), Realtime, RLS |
 | Intégration | `@nuxtjs/supabase` |
-| Tests | Vitest (logique de calcul), Playwright (parcours clés, lot 5+) |
+| Tests | Vitest (logique de calcul), pgTAP (`npx supabase test db` : RLS et fonctions SQL), Playwright (parcours clés, lot 5+) |
 | Hébergement | Vercel, déploiement auto sur push `main`, previews sur PR |
 | Qualité | ESLint, `vue-tsc`, CI GitHub Actions |
 
@@ -63,11 +63,11 @@ Listes de tags (texte, extensibles sans migration, valeurs proposées par défau
 
 ### 5.2 Tables
 
-**households** — `id`, `name`, `created_at`
+**households** — `id`, `name`, `created_at`. En V1, un index unique limite la table à une ligne (app mono-famille).
 
-**household_members** — `household_id`, `user_id` (→ `auth.users`), `role caregiver`, `display_name`, PK (`household_id`, `user_id`)
+**household_members** — `household_id`, `user_id` (→ `auth.users`), `role caregiver`, `display_name`, `created_at`, PK (`household_id`, `user_id`). `unique (user_id)` en V1 ; unicité de `(household_id, role)` limitée aux rôles `maman` et `papa` ; le rôle `autre` est permis, sans plafond de membres.
 
-**children** — `id`, `household_id`, `first_name`, `birth_date date`
+**children** — `id`, `household_id`, `first_name`, `birth_date date`, `created_at`
 
 **observation_periods** — `id`, `child_id`, `label`, `start_date`, `end_date` (défaut : +13 jours)
 
@@ -126,15 +126,18 @@ Contrainte : `back_asleep_at is null or back_asleep_at > woke_at`.
 ### 5.4 Sécurité (RLS)
 
 - RLS activée sur **toutes** les tables.
-- Fonction `is_household_member(household_id uuid) returns boolean` (`security definer`, `search_path` fixé).
-- Chaque table est filtrée via la chaîne `child → household`. Lecture et écriture réservées aux membres du foyer.
-- Aucune clé `service_role` côté client. Invitation par email : table `household_invitations (household_id, email, role, accepted_at)`.
+- Fonctions `is_household_member(household_id uuid)` (tout membre) et `is_household_parent(household_id uuid)` (membre de rôle `maman` ou `papa`), `returns boolean`, `security definer`, `search_path` fixé. Les deux refusent une session ouverte par mot de passe : l'app ne connecte que par code ou par lien.
+- Chaque table est filtrée via la chaîne `child → household`. Foyer, membres et enfant : lecture par les membres, écriture par les parents. Invitations et tables des lots 2 à 8 (nuits, réveils, périodes d'observation) : parents seulement, via `is_household_parent()`. Les droits du rôle `autre` sont définis au lot 9.
+- Aucune clé `service_role` côté client. Invitation : table `household_invitations (id, household_id, email, role, invited_by, created_at, accepted_at)`. L'adresse est stockée en minuscules ; une seule invitation en attente par foyer ; la révocation supprime la ligne ; pas d'expiration en V1. L'app n'envoie pas d'email d'invitation : elle autorise l'adresse, et Supabase Auth envoie l'email de connexion (code à 6 chiffres et lien) quand la personne le demande sur `/login`. L'acceptation est une action explicite, exécutée par une fonction `security definer` qui compare l'adresse de la session à celle de l'invitation, sans tenir compte de la casse. La création du foyer (foyer, enfant, membre) passe par une fonction unique, refusée si un foyer existe déjà.
+- Les comptes sont fermés côté serveur par le crochet Supabase Auth *before user created* (`hook_before_user_created`), à activer dans le tableau de bord : seule une adresse ayant une invitation en attente peut obtenir un compte. Fonctions de l'app : `get_onboarding_state()`, `create_household(…)`, `invite_member(email, role)`, `accept_invitation(display_name)`, `update_my_membership(display_name, role)` ; au lot 1 elles refusent le rôle `autre`. Aucune écriture directe sur `household_members`.
 
 ## 6. Écrans
 
 | Route | Rôle |
 |---|---|
-| `/login` | Lien magique |
+| `/login` | Connexion par code à 6 chiffres reçu par email (le lien du même email fonctionne dans un navigateur) |
+| `/confirm` | Retour du lien de l'email : la page vérifie le lien et connecte ; affiche un message si le lien n'est plus valable |
+| `/bienvenue` | Création du foyer et de l'enfant (premier parent) ou acceptation d'une invitation (second parent) ; message si aucun foyer n'est associé au compte |
 | `/` | **Écran contextuel** : de 17 h à 23 h → « Ce soir » ; de 23 h à 7 h → « Cette nuit » ; de 7 h à 11 h → « Ce matin ». Accès aux deux autres en 1 tap. |
 | `/nuits/[date]/soir` | Formulaire soirée |
 | `/nuits/[date]/reveils` | Liste des réveils de la nuit + édition |
@@ -143,7 +146,7 @@ Contrainte : `back_asleep_at is null or back_asleep_at > woke_at`.
 | `/historique` | Liste des nuits, badges (nb réveils, signaux) |
 | `/bilan` | Bilan de la période d'observation |
 | `/export` | Génération du PDF |
-| `/reglages` | Foyer, enfant, membres, invitations, période d'observation |
+| `/reglages` | Foyer, enfant, membres, invitations, déconnexion (période d'observation ajoutée au lot 6) |
 
 ### 6.1 Actions rapides de nuit
 
@@ -209,7 +212,7 @@ Règles d'affichage :
 | Lot | Contenu | Critère de fin |
 |---|---|---|
 | 0 | Socle : Nuxt, Tailwind, PWA, Supabase, CI, déploiement Vercel | Page d'accueil déployée, CI verte |
-| 1 | Auth lien magique, foyer, enfant, invitation | Les 2 parents voient le même foyer |
+| 1 | Auth par code à 6 chiffres (et lien), foyer, enfant, invitation du second parent, `/bienvenue`, `/reglages` (sans période d'observation). Le modèle n'interdit ni le rôle `autre` ni plus de deux membres. | Les 2 parents voient le même foyer |
 | 2 | Formulaire soirée | Une nuit complète saisie et relue |
 | 3 | Réveils + actions rapides | Réveil en 1 tap, frise d'une nuit |
 | 4 | Matin + signaux santé | Nuit clôturée, badge signaux |
@@ -217,11 +220,11 @@ Règles d'affichage :
 | 6 | Bilan de période | Tableau du carnet calculé, tests verts |
 | 7 | Export PDF | PDF lisible imprimé |
 | 8 | Hors-ligne + temps réel | Saisie en mode avion puis synchro |
-| 9 | Siestes, contexte de journée | V2 |
+| 9 | Siestes, contexte de journée ; invitation de la nounou (rôle `autre`, droits limités à la saisie de son activité de la journée) | V2 |
 
 ## 11. Hors périmètre V1
 
-Notifications, multi-enfants dans l'UI (le modèle le permet), comptes tiers, IA d'analyse, intégration objets connectés.
+Notifications, multi-enfants dans l'UI (le modèle le permet), comptes tiers autres que la nounou (prévue au lot 9), IA d'analyse, intégration objets connectés.
 
 ## 12. Décisions
 
@@ -233,6 +236,13 @@ Notifications, multi-enfants dans l'UI (le modèle le permet), comptes tiers, IA
 | Rendu | **SPA** (`ssr: false`) | Tout le rendu se fait dans le navigateur, à l'heure du téléphone (les serveurs Vercel sont en UTC). Prépare le hors-ligne du lot 8. |
 | Node / TypeScript | **Node 24** (`.nvmrc`, `engines`) · **TypeScript 5.9** | Nuxt 4.5 exige Node ≥ 24.11. TypeScript 7 est incompatible avec ESLint et `vue-tsc` : ne pas monter de version sans vérifier leur compatibilité. |
 | Clé Supabase côté client | Clé **publique** (`anon` ou `sb_publishable_…`) | Exposée via `NUXT_PUBLIC_SUPABASE_KEY`. Jamais de clé `service_role` / `sb_secret_…` côté client. |
+| Connexion | Code à 6 chiffres **et** lien dans le même email de connexion | Sur iPhone, un lien d'email ne s'ouvre jamais dans la PWA installée (stockage séparé de Safari) : le code saisi dans l'app est le moyen de s'y connecter. Le lien reste utilisable dans un navigateur. |
+| Code et lien de connexion | 6 chiffres, valables 15 minutes, un seul jeton pour les deux ; le lien pointe vers `/confirm`, qui le vérifie | Un nouveau code remplace l'ancien. Le lien n'est pas consommé par un simple préchargement de messagerie. |
+| Session | `localStorage`, flux implicite (`useSsrCookies: false`) | Aucun jeton envoyé à Vercel. |
+| Protection des routes | Middleware global maison, `supabase.redirect: false` | Redirections `/login`, `/bienvenue`, `/` décidées par une fonction pure testée. |
+| Portée V1 | App mono-famille : un seul foyer, comptes fermés | Le premier parent est créé à la main dans Supabase, le second par l'invitation. Ouvrir à d'autres familles exigera une décision de spec. |
+| Envoi d'emails | SMTP d'un compte Gmail dédié à l'app (mot de passe d'application) | Sans SMTP personnalisé, Supabase n'envoie qu'aux membres de l'organisation du projet. Aucun nom de domaine à gérer ; identifiants saisis uniquement dans le tableau de bord Supabase. Limites d'envoi de Gmail : voir `README.md`. |
+| Rôles et nounou | Maman et Papa uniques par foyer ; rôle `autre` permis par le modèle ; nounou au lot 9 avec droits limités | Aucun plafond de membres en base. Au lot 1, l'interface n'invite que le second parent. Toute politique d'accès des lots 2 à 8 doit pouvoir exclure le rôle `autre`. |
 
 ## 13. Questions ouvertes
 
